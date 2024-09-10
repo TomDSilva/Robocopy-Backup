@@ -32,6 +32,7 @@
 #                    Added basic sanity checks for source and destination. Will now popup with an error if not sufficient.    #
 #                    Added runtime banner.                                                                                    #
 #                    Fixed bug when checking if using a temp script.                                                          #
+# 1.7 : 10/09/2024 : Fixed an issue with backslashes at the end of paths being read as an escape character.                   #
 ###############################################################################################################################
 
 ###############################################################################################################################
@@ -132,14 +133,14 @@ if ($runAsAdmin -eq $true) {
 
         # Check if the temp directory exists, if not then creates it
         if (-not (test-path $tempLocation)) {
-            New-Item $tempLocation -ItemType "directory"
+            New-Item $tempLocation -ItemType 'directory'
         }
 
         # Copy our script to a temp location to be run as admin:
         Copy-Item -Path $MyInvocation.MyCommand.Path -Destination $tempLocation
 
         # Relaunch this temp script as an elevated process:
-        Start-Process powershell.exe "-File", ('"{0}"' -f $tempScript) -Verb RunAs
+        Start-Process powershell.exe '-File', ('"{0}"' -f $tempScript) -Verb RunAs
 
         # Exit (this current non admin session)
         exit
@@ -222,7 +223,7 @@ foreach ($sourceDir in $sourceDirs){
 ### Start of Stop PC Sleeping                                                                                               ###
 ###############################################################################################################################
 
-# Define the properties of a custom power scheme, to be created on demand.
+# To stop the PC sleeping temporarily, define the properties of a custom power scheme, to be created on demand.
 $schemeGuid = 'e03c2dc5-fac9-4f5d-9948-0a2fb9009d67' # randomly created with New-Guid
 $schemeName = 'Always on'
 $schemeDescr = 'Custom power scheme to keep the system awake indefinitely.'
@@ -268,12 +269,22 @@ try {
         $logLocation = "$env:USERPROFILE\Desktop"
     }
 
-    # Sanitize string
+    # Sanitize log path:
     if ($logLocation[-1] -eq '\') {
         $logLocation = $logLocation.TrimEnd('\')
     }
+    
+    # Sanitize source paths:
+    $sanitizedSourceDirs = @()
+    foreach ($sourceDir in $sourceDirs) {
+        if ($sourceDir[-1] -eq '\') {
+            $sanitizedSourceDirs += $sourceDir.TrimEnd('\')
+        } else {
+            $sanitizedSourceDirs += $sourceDir
+        }
+    }
 
-    # Sanitize string
+    # Sanitize destination path:
     if ($destinationDirRoot[-1] -eq '\') {
         $destinationDirRoot = $destinationDirRoot.TrimEnd('\')
     }
@@ -288,7 +299,7 @@ try {
         Find-Credential($destinationClient)
     }
 
-    foreach ($sourceDir in $sourceDirs) {
+    foreach ($sourceDir in $sanitizedSourceDirs) {
 
         $folderName = $sourceDir.Split('\')[-1]
 
@@ -365,5 +376,5 @@ finally {
     }
 
     # Wait for the user to acknowledge with the enter key
-    Read-Host -Prompt "Press Enter to exit"
+    Read-Host -Prompt 'Press Enter to exit'
 }
